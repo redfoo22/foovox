@@ -1,0 +1,25 @@
+# Credentials and state. `data/` holds admin-token.txt (grants the right to
+# mint pairing codes) and devices.json (hashed device tokens). This project is
+# intended to be published, so these are ignored from the first commit rather
+# than after the first accident.
+data/
+
+# Models: 338 MB, downloaded by `foovox install`.
+models/
+
+# Environments and build output
+venv/
+node_modules/
+__pycache__/
+*.pyc
+
+# Local audio artefacts from the test harness
+*.wav
+*.mp3
+!docs/*.mp3
+
+# CLI process bookkeeping
+data/pids.json
+
+# Screenshots from the browser tests
+shot-*.png

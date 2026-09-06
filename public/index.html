@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Foovox</title>
+<!-- viewport-fit=cover + the safe-area insets in the CSS: without it the mic
+     button sits under the iPhone home indicator and is hard to hit. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b0a0d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Foovox">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<div id="rail-scrim"></div>
+
+<aside id="rail-panel">
+  <header class="rail-head">
+    <h2>Sessions</h2>
+    <button id="new-session" class="ghost">+ New</button>
+  </header>
+  <div id="rail"></div>
+  <footer class="rail-foot">
+    <label class="row">
+      <span>Model</span>
+      <select id="model">
+        <option value="claude-sonnet-5">Sonnet 5 — fast</option>
+        <option value="claude-opus-5">Opus 5 — smartest</option>
+        <option value="claude-fable-5">Fable 5 — deep, slower</option>
+        <option value="claude-haiku-4-5-20251001">Haiku 4.5 — cheapest</option>
+      </select>
+    </label>
+    <label class="row">
+      <span>Silence before it answers</span>
+      <output id="silence-value">800 ms</output>
+    </label>
+    <input id="silence" type="range" min="300" max="1500" step="50">
+    <label class="row">
+      <span>Interrupt sensitivity</span>
+      <output id="sens-value">35%</output>
+    </label>
+    <!-- Low = triggers easily, high = you must speak up. It is a position
+         between the measured room level and your measured voice level, so it
+         means the same thing in a quiet bedroom and next to the surf. -->
+    <input id="sens" type="range" min="5" max="90" step="5">
+    <button id="calibrate" class="ghost wide">Calibrate to this room</button>
+    <label class="row check">
+      <input id="barge" type="checkbox">
+      <span>Let me talk over it</span>
+    </label>
+    <label class="row">
+      <span>What it may do</span>
+      <select id="tier">
+        <option value="chat">Chat only</option>
+        <option value="read">Read files</option>
+        <option value="build">Build (write files)</option>
+        <option value="full">Full (run commands)</option>
+      </select>
+    </label>
+    <p id="tier-note"></p>
+    <!-- There is no devtools on a phone. Without these numbers, a report can
+         only say "it cut me off", and the cause has to be guessed at. -->
+    <div id="diag">
+      <div class="d-row"><span>now</span><b id="d-mic">—</b></div>
+      <div class="d-row"><span>bar to start</span><b id="d-thr">—</b></div>
+      <div class="d-row"><span>bar to keep going</span><b id="d-hold">—</b></div>
+      <div class="d-row"><span>room</span><b id="d-floor">—</b></div>
+      <div class="d-row"><span>your voice</span><b id="d-voice">—</b></div>
+      <div class="d-row"><span>echo leak</span><b id="d-cpl">—</b></div>
+      <div class="d-row"><span>speaker delay</span><b id="d-lag">—</b></div>
+      <div class="d-row"><span>self-cutoffs</span><b id="d-cut">0</b></div>
+    </div>
+  </footer>
+</aside>
+
+<main class="tp-app">
+  <header id="bar">
+    <button id="rail-toggle" class="ghost" aria-label="Sessions">☰</button>
+    <div class="title">
+      <strong>Foovox</strong>
+      <small id="who"></small>
+    </div>
+    <small id="status">connecting…</small>
+  </header>
+
+  <div id="transcript">
+    <div id="empty">
+      <p><strong>Tap Talk, then just speak.</strong></p>
+      <p>It answers out loud, then keeps listening. Talk over it to cut it off.</p>
+      <p><strong>Or hold Talk down</strong> like a walkie-talkie and let go to
+         send. Nothing can cut you off while you hold it, so use that one in a
+         noisy room.</p>
+      <p class="quiet">Tools are off. Arm them in the menu if you want it to
+         run commands on the machine.</p>
+    </div>
+  </div>
+
+  <div id="composer">
+    <input id="typed" placeholder="or type…" autocomplete="off" autocapitalize="sentences">
+    <button id="send" class="ghost">Send</button>
+  </div>
+
+  <!-- Live input level with the trigger threshold marked on it. Without this
+       the only way to tune a room is trial and error. -->
+  <div id="meter" aria-hidden="true">
+    <div id="meter-fill"></div>
+    <div id="meter-thr"></div>
+    <span id="meter-db">—</span>
+  </div>
+
+  <div id="dock">
+    <button id="mic">Talk</button>
+    <div id="orb"><span></span><span></span><span></span></div>
+  </div>
+</main>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>

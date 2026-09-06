@@ -1,0 +1,35 @@
+{
+  "name": "foovox",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Talk to Claude Code out loud, from your phone. Local speech, one-use pairing codes, no open ports.",
+  "scripts": {
+    "start": "node server/index.mjs",
+    "speech": "node scripts/speech.mjs",
+    "pair": "node scripts/pair.mjs",
+    "roundtrip": "node scripts/test-client.mjs",
+    "turns": "node scripts/test-turns.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "browser": "node scripts/test-browser.mjs",
+    "voice": "node scripts/test-voice.mjs",
+    "foovox": "node bin/foovox.mjs",
+    "setup": "node bin/foovox.mjs setup",
+    "doctor": "node bin/foovox.mjs doctor",
+    "verify:tiers": "node scripts/verify-tiers.mjs",
+    "levels": "node scripts/test-levels.mjs",
+    "ptt": "node scripts/test-ptt.mjs",
+    "say": "node scripts/test-say.mjs",
+    "spoken": "node scripts/test-spoken.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "bin": {
+    "foovox": "./bin/foovox.mjs"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  }
+}

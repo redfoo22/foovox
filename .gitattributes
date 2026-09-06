@@ -1,0 +1,34 @@
+# Line endings, pinned rather than left to each contributor's git config.
+#
+# This is developed on Windows and installed on macOS, and `install.sh` is the
+# first thing anyone runs. A shell script committed with CRLF fails there with
+# `bad interpreter: /usr/bin/env bash^M` — an error that says nothing about the
+# real cause and cannot happen on the machine that produced it.
+#
+# It is correct today only because this machine has core.autocrlf=true. A
+# contributor with autocrlf=false would commit CRLF and break the installer for
+# everyone else, so the repository states the requirement itself.
+
+* text=auto eol=lf
+
+# Anything with a shebang, and anything a POSIX shell reads.
+*.sh   text eol=lf
+*.mjs  text eol=lf
+*.js   text eol=lf
+*.cjs  text eol=lf
+*.py   text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.css  text eol=lf
+*.html text eol=lf
+
+# PowerShell is the exception: it is only ever run on Windows, and some older
+# hosts are unhappy with LF-only scripts.
+*.ps1  text eol=crlf
+
+*.png  binary
+*.jpg  binary
+*.mp3  binary
+*.wav  binary
+*.onnx binary
+*.bin  binary

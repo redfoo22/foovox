@@ -1,0 +1,96 @@
+/*
+ * Teleport's skin, ported from looseygoosey.xyz.
+ *
+ * That site keeps every colour in custom properties so a theme file can
+ * restyle the whole thing by redefining a handful of variables, and its
+ * components never name a colour directly. Teleport had the opposite: a `C`
+ * object of hex literals threaded through inline styles, which meant a theme
+ * was impossible without touching every component.
+ *
+ * So the values are the same values, but the arrangement is the reason for
+ * copying it. `C` now resolves to `var(--...)`, which means the next skin is
+ * a file like this one rather than a refactor.
+ *
+ * Names are unprefixed to match the source, so the two projects can share
+ * theme files verbatim.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* party-rock-animal, the theme the live site actually serves. */
+  --accent: #ff2d95;          /* fuchsia — the thing your eye follows */
+  --accent-2: #21e6d0;        /* aqua */
+  --accent-3: #ffd639;        /* yellow */
+  --silver: #c8ccd4;
+  --gold: #d9a441;
+
+  --bg: #0b0a0d;
+  --panel: #17141c;
+  --line: #322a3c;
+  --text: #f2eef6;
+  --dim: #9b93a8;
+
+  /* Teleport-only, derived so a skin does not have to know about them. */
+  --accent-dim: color-mix(in srgb, var(--accent) 26%, var(--panel));
+  --accent-text: color-mix(in srgb, var(--accent) 62%, var(--text));
+  --good: var(--accent-2);
+  --warn: var(--accent-3);
+  /* Surfaces sit over the print, so they are translucent rather than solid.
+     Fully opaque panels would hide the background entirely and there would be
+     no point having ported it. */
+  --panel-veil: color-mix(in srgb, var(--panel) 82%, transparent);
+}
+
+/*
+ * The print.
+ *
+ * An inline SVG data URI rather than an image file: sharp at any zoom, no
+ * request, tiles seamlessly, and recolourable by editing one line. feTurbulence
+ * at a low baseFrequency makes organic blobs — regular shapes read as polka
+ * dots, and the point of cow print is that no two patches match.
+ */
+body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1100px 700px at 12% -8%, rgba(255, 45, 149, .16), transparent 60%),
+    radial-gradient(900px 600px at 92% 4%, rgba(33, 230, 208, .12), transparent 62%),
+    radial-gradient(800px 800px at 50% 108%, rgba(255, 214, 57, .10), transparent 60%),
+    url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='520' height='520' viewBox='0 0 520 520'>\
+<filter id='b'>\
+<feTurbulence type='fractalNoise' baseFrequency='0.011' numOctaves='4' seed='11'/>\
+<feColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  -14 0 0 0 5.2'/>\
+</filter>\
+<rect width='520' height='520' filter='url(%23b)' fill='%23ffffff'/>\
+</svg>");
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat;
+  background-size: auto, auto, auto, 520px 520px;
+  /* `fixed` on the washes only. The app shell is itself fixed and scrolls its
+     own panes, so a fixed tile would sit still while the room moves past it. */
+  background-attachment: fixed, fixed, fixed, fixed;
+}
+
+/* The print sits under everything at low opacity. Any higher and text over a
+   patch edge is genuinely hard to read on a phone in sunlight. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: var(--bg);
+  opacity: .82;
+  z-index: -1;
+}
+
+/*
+ * The app shell must not paint over the background.
+ *
+ * Teleport's root carried a solid colour, which would cover the print
+ * completely — the theme would be installed and invisible. Surfaces inside it
+ * keep their own translucent panel colour instead.
+ */
+.tp-app {
+  background: transparent !important;
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}

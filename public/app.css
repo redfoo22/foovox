@@ -1,0 +1,334 @@
+/*
+ * Foovox layout. Colours come from theme.css and are never named here — the
+ * whole point of porting that file is that a re-skin is a file swap rather
+ * than a refactor.
+ */
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  color: var(--text);
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.tp-app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  /* The notch and the home indicator. Without these the header hides under
+     the status bar and the mic button under the gesture bar. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ---------------------------------------------------------------- header */
+
+#bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-veil);
+  backdrop-filter: blur(12px);
+}
+#bar .title { flex: 1; display: flex; flex-direction: column; line-height: 1.2; }
+#bar .title strong { font-size: 16px; }
+#bar small { color: var(--dim); font-size: 11px; }
+#status { text-align: right; max-width: 45%; }
+
+.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font: 600 14px/1 inherit;
+  cursor: pointer;
+}
+.ghost:active { background: var(--accent-dim); }
+
+/* ---------------------------------------------------------------- transcript */
+
+#transcript {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* First run: a blank screen over the print reads as "broken", not "ready". */
+#empty {
+  margin: auto;
+  text-align: center;
+  color: var(--dim);
+  max-width: 300px;
+  padding: 24px;
+  background: var(--panel-veil);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+#empty p { margin: 0 0 10px; font-size: 14px; }
+#empty p:last-child { margin: 0; }
+#empty strong { color: var(--text); }
+#empty .quiet { font-size: 12px; color: var(--warn); opacity: .75; }
+
+.msg {
+  max-width: 84%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.msg.me {
+  align-self: flex-end;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-bottom-right-radius: 4px;
+}
+.msg.them {
+  align-self: flex-start;
+  background: var(--panel-veil);
+  border: 1px solid var(--line);
+  border-bottom-left-radius: 4px;
+}
+.msg.note {
+  align-self: center;
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: var(--dim);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------- composer */
+
+#composer {
+  display: flex;
+  gap: 8px;
+  padding: 8px 14px;
+}
+#typed {
+  flex: 1;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 11px 14px;
+  /* 16px exactly: anything smaller and iOS zooms the page on focus. */
+  font: 16px/1.2 inherit;
+}
+#typed:focus { outline: none; border-color: var(--accent); }
+
+/* ---------------------------------------------------------------- dock */
+
+#dock {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 14px 16px;
+}
+
+#mic {
+  flex: 1;
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 14px;
+  padding: 16px;
+  font: 700 17px/1 inherit;
+  cursor: pointer;
+  /* A long press must not select the label, raise the iOS callout, or be read
+     as the start of a scroll. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+/* Held: unmistakable, because the only thing holding the turn open is a thumb
+   and letting go by accident sends half a sentence. */
+body.held #mic {
+  background: #d9483b;
+  color: #fff;
+  border: 0;
+  transform: scale(0.98);
+  box-shadow: 0 0 0 4px rgba(217, 72, 59, 0.3);
+}
+body.listening #mic { background: var(--panel); border: 1px solid var(--line); color: var(--dim); }
+
+/*
+ * The orb is the only thing that says which of four states you are in, and it
+ * has to be readable at a glance from across a room with the phone on a desk:
+ * hearing you, thinking, speaking, or idle.
+ */
+#orb { display: flex; gap: 5px; align-items: center; height: 34px; width: 46px; justify-content: center; }
+#orb span {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--line);
+  transition: background .2s, height .12s;
+}
+body.listening #orb span { background: var(--dim); }
+body.hearing  #orb span { background: var(--accent-2); animation: bounce .6s infinite ease-in-out; }
+body.thinking #orb span { background: var(--accent-3); animation: pulse 1.1s infinite ease-in-out; }
+body.speaking #orb span { background: var(--accent); animation: bounce .45s infinite ease-in-out; }
+#orb span:nth-child(2) { animation-delay: .12s; }
+#orb span:nth-child(3) { animation-delay: .24s; }
+
+@keyframes bounce { 0%,100% { height: 8px; } 50% { height: 22px; } }
+@keyframes pulse  { 0%,100% { opacity: .3; } 50% { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  #orb span { animation: none !important; }
+}
+
+/* ---------------------------------------------------------------- rail */
+
+#rail-panel {
+  position: fixed;
+  z-index: 3;
+  top: 0; bottom: 0; left: 0;
+  width: min(82vw, 320px);
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  transform: translateX(-100%);
+  transition: transform .22s ease;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+body.rail-open #rail-panel { transform: none; }
+
+#rail-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  background: rgba(0, 0, 0, .5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .22s;
+}
+body.rail-open #rail-scrim { opacity: 1; pointer-events: auto; }
+
+.rail-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px; border-bottom: 1px solid var(--line);
+}
+.rail-head h2 { margin: 0; font-size: 15px; color: var(--dim); font-weight: 600; }
+
+#rail { flex: 1; overflow-y: auto; padding: 8px; }
+
+.rail-item {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; text-align: left;
+  background: transparent; border: 0; border-radius: 10px;
+  padding: 11px 10px; margin-bottom: 2px;
+  color: var(--text); font: 14px/1.35 inherit; cursor: pointer;
+}
+.rail-item:active, .rail-item.active { background: var(--accent-dim); }
+.rail-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); flex: none; }
+/* Warm means a live process is holding this conversation in memory. Cold ones
+   still work — they resume — they just pay the start again. */
+.dot.warm { background: var(--good); }
+
+.badge {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--warn); border: 1px solid var(--warn);
+  border-radius: 5px; padding: 1px 4px;
+}
+
+.rail-foot { padding: 14px; border-top: 1px solid var(--line); }
+.rail-foot .row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; font-size: 13px; color: var(--dim); margin-bottom: 6px;
+}
+.rail-foot .row.check { justify-content: flex-start; }
+.rail-foot .row.danger span { color: var(--warn); }
+.rail-foot .row em { color: var(--dim); font-style: normal; font-size: 11px; }
+.rail-foot input[type=range] { width: 100%; accent-color: var(--accent); margin-bottom: 14px; }
+.rail-foot input[type=checkbox] { accent-color: var(--accent); width: 18px; height: 18px; }
+
+/* Live numbers from the echo model. Debugging voice on a phone is otherwise
+   blind: the only report available is "it cut me off", with no way to see why. */
+#diag { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);
+        font: 11px/1.6 ui-monospace, monospace; color: var(--dim); }
+.d-row { display: flex; justify-content: space-between; gap: 8px; }
+.d-row b { color: var(--accent-2); font-weight: 600; }
+body.speaking .d-row b { color: var(--accent); }
+
+/* ---------------------------------------------------------------- meter */
+
+/*
+ * Input level, in dBFS, with the threshold marked.
+ *
+ * Tuning a room by trial and error means guessing at two invisible numbers at
+ * once. Seeing the level rise when you speak, and where the line sits, turns
+ * it into one glance: if the waves outside are already past the mark, the
+ * sensitivity is wrong for this room.
+ */
+#meter {
+  position: relative;
+  height: 20px;
+  margin: 0 14px 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  overflow: hidden;
+}
+#meter-fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 0;
+  background: linear-gradient(90deg, var(--accent-2), var(--accent-3), var(--accent));
+  transition: width .05s linear;
+}
+/* The line you have to cross. */
+#meter-thr {
+  position: absolute; top: -1px; bottom: -1px;
+  width: 2px;
+  background: var(--text);
+  box-shadow: 0 0 0 1px var(--bg);
+  left: 50%;
+}
+/* Left, not right: the threshold marker lives wherever the bar is set, and on
+   a loud calibration that is the right-hand end, directly under the label. */
+#meter-db {
+  position: absolute; left: 8px; top: 0; line-height: 20px;
+  font: 10px/20px ui-monospace, monospace; color: var(--text);
+  mix-blend-mode: difference;
+}
+/* Over the line: about to be treated as speech. */
+#meter.hot #meter-fill { filter: brightness(1.25); }
+
+.ghost.wide { width: 100%; margin-top: 4px; }
+#calibrate.busy { color: var(--warn); border-color: var(--warn); }
+
+.rail-foot select {
+  background: var(--bg); color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 8px; font: 12px/1.2 inherit; max-width: 60%;
+}
+
+/* Job state in the rail. Busy pulses because "is it still going" is the
+   question being asked, and a static dot cannot answer it. */
+.dot.busy { background: var(--accent); animation: pulse 1.1s infinite ease-in-out; }
+.dot.bad { background: var(--warn); }
+.rail-title em {
+  display: block; font-style: normal; font-size: 11px;
+  color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* What a tier actually permits, in words, next to the control that grants it.
+   A dropdown labelled "Full" tells you nothing about what you just handed
+   over; the machine this runs on is somebody's own. */
+#tier-note {
+  margin: 2px 0 12px; font-size: 11px; line-height: 1.45; color: var(--dim);
+}
+#tier-note.danger { color: var(--warn); }
