@@ -1,4 +1,5 @@
 import http from 'node:http';
+import os from 'node:os';
 import path from 'node:path';
 import { createReadStream, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
@@ -26,6 +27,17 @@ import { isJunk } from './junk.mjs';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
 const HOST = '127.0.0.1';
+/*
+ * Who this instance belongs to — shown under the title in the app.
+ *
+ * This was the string `'redfoo'`, hardcoded, so every install anywhere would
+ * have greeted its owner with the name of the person who wrote it. Taken from
+ * the account running the server instead, which is right on anyone's machine
+ * including the original one, and overridable for a shared box.
+ */
+const DEFAULT_USER = process.env.FOOVOX_USER
+  || (() => { try { return os.userInfo().username; } catch { return 'you'; } })();
+
 const PORT = Number(process.env.FOOVOX_PORT ?? 3210);
 const SPEECH = process.env.FOOVOX_SPEECH ?? 'http://127.0.0.1:3211';
 
@@ -201,7 +213,7 @@ const server = http.createServer(async (req, res) => {
     const existing = deviceFor(req);
     if (!isAdmin(req) && !existing) return json(res, 401, { error: 'not authorised' });
     const body = await readBody(req);
-    const principalId = String(body.principalId ?? existing?.principalId ?? 'redfoo');
+    const principalId = String(body.principalId ?? existing?.principalId ?? DEFAULT_USER);
     const pairing = devices.createPairing({
       principalId,
       label: body.label ?? 'phone',

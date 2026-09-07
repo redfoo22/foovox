@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+/** Whoever is running this, rather than whoever happened to write it. */
+const defaultUser = () => process.env.FOOVOX_USER
+  || (() => { try { return os.userInfo().username; } catch { return 'you'; } })();
 
 /**
  * Mint a pairing code.
@@ -33,7 +38,7 @@ const res = await fetch(`${BASE}/api/auth/pair`, {
   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
   body: JSON.stringify({
     label: arg('label', 'phone'),
-    principalId: arg('principal', 'redfoo'),
+    principalId: arg('principal', defaultUser()),
     ttlMs: parseTtl(arg('ttl')),
   }),
 });

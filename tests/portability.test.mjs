@@ -85,6 +85,31 @@ test('the pm2 config resolves python rather than naming it', () => {
     'the pm2 config still names a Windows-only path unconditionally');
 });
 
+/**
+ * Every name that identifies the author, not just the OS account.
+ *
+ * The first version of this checked `os.userInfo().username` alone. That is
+ * `redfo` on the machine this was written on, while the string baked into the
+ * server as the default account label was `redfoo` — one letter apart, so the
+ * guard passed and every install anywhere would have greeted its owner by the
+ * author's name. The git identity and the GitHub owner in the remote URL are
+ * the other two spellings of "the person who wrote this".
+ */
+function authorNames() {
+  const names = new Set([os.userInfo().username]);
+  const add = (v) => { if (v && v.length > 2) names.add(v.trim()); };
+  const quiet = (args) => {
+    try { return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { return ''; }
+  };
+  add(quiet(['config', 'user.name']));
+  const remote = quiet(['remote', 'get-url', 'origin']);
+  add(remote.match(/github\.com[/:]([^/]+)\//)?.[1]);
+  // The owner slug and the person are usually the same name with digits on the
+  // end; check the letters too, since that is what gets typed into code.
+  for (const n of [...names]) add(n.replace(/\d+$/, ''));
+  return [...names];
+}
+
 test('no developer home directory escapes into a shipped file', () => {
   /*
    * Checked against *this* machine's username rather than a generic pattern.
@@ -155,6 +180,37 @@ test('the shell installer is stored with unix line endings', () => {
   const eol = execFileSync('git', ['ls-files', '--eol', 'install.sh'],
     { cwd: ROOT, encoding: 'utf8' });
   assert.match(eol, /^i\/lf/, `install.sh is not LF in the index: ${eol.trim()}`);
+});
+
+test('the author is not hardcoded into what other people will see', () => {
+  /*
+   * `server/index.mjs` defaulted the account label to the literal string
+   * 'redfoo', so the app showed the author's name under the title on every
+   * install, on anyone's machine. It is the kind of thing that is invisible to
+   * the person who wrote it and obvious to everyone else.
+   *
+   * Runtime code only. Tests and prose may name whatever they need to.
+   */
+  const names = authorNames();
+  const offenders = [];
+  for (const file of shippedFiles()) {
+    if (file.endsWith('.md') || file.startsWith('tests/')) continue;
+    const lines = read(file).split('\n');
+    lines.forEach((line, i) => {
+      // The repository URL is legitimately the owner's, everywhere it appears.
+      if (/github\.com|githubusercontent|FOOVOX_REPO/.test(line)) return;
+      // Comments may name it; that is how the fix explains itself. Only a value
+      // in live code ends up in front of another person.
+      if (/^\s*(\*|\/\/|#)/.test(line)) return;
+      for (const name of names) {
+        if (new RegExp(`['"\`]${name}['"\`]`, 'i').test(line)) {
+          offenders.push(`${file}:${i + 1} ${line.trim().slice(0, 70)}`);
+        }
+      }
+    });
+  }
+  assert.deepEqual(offenders, [],
+    `the author's name is baked into code other people will run:\n  ${offenders.join('\n  ')}`);
 });
 
 test('the installer names a repository that is actually configured', () => {
