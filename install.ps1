@@ -31,9 +31,22 @@ Need 'git'    'winget install Git.Git'
 Need 'node'   'winget install OpenJS.NodeJS.LTS'
 Need 'python' 'winget install Python.Python.3.12'
 
+# Read the version from `node --version` and parse it here, rather than asking
+# node to parse it and print the answer.
+#
+# The obvious spelling, `node -p 'process.versions.node.split(".")[0]'`, does
+# not survive PowerShell: it strips the inner double quotes before node ever
+# sees them, so node receives `split(.)`, throws a SyntaxError, and the result
+# casts to 0. Every Windows machine was then told "Node 0 is too old; 20+
+# required" and the install stopped — on machines with a perfectly good Node.
+# The same line is fine in install.sh, because single quotes in bash keep the
+# double quotes intact, which is exactly why it was not noticed.
 if (Get-Command node -ErrorAction SilentlyContinue) {
-    $major = [int](node -p 'process.versions.node.split(".")[0]')
-    if ($major -lt 20) { Bad "Node $major is too old; 20+ required"; $missing = 1 }
+    $raw = (node --version) -replace '^v', ''      # "v22.23.1" -> "22.23.1"
+    $major = 0
+    [void][int]::TryParse($raw.Split('.')[0], [ref]$major)
+    if ($major -lt 20) { Bad "Node $raw is too old; 20+ required"; $missing = 1 }
+    else { Info "Node $raw" }
 }
 
 # ffmpeg is not optional: replies are sent as mp3, and without an encoder every

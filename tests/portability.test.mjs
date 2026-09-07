@@ -110,6 +110,27 @@ test('no credential or private hostname is in a shipped file', () => {
     `a real tailnet hostname or long hex secret is in: ${offenders.join(', ')}`);
 });
 
+test('the PowerShell installer never passes a quoted script to node', () => {
+  /*
+   * PowerShell strips inner double quotes before a native command sees them.
+   * `node -p 'process.versions.node.split(".")[0]'` therefore reached node as
+   * `split(.)`, threw, and cast to 0 — so the installer told every Windows
+   * machine "Node 0 is too old" and refused to run. The identical line in
+   * install.sh is correct, because bash keeps the quotes, which is why it
+   * survived review.
+   *
+   * The rule is simply: do not ask node to evaluate a string here. Read
+   * `node --version` and parse it in PowerShell, where the quoting is ours.
+   */
+  const ps = read('install.ps1');
+  const evals = ps.split('\n')
+    .filter((l) => !/^\s*#/.test(l))
+    .filter((l) => /\bnode\s+-(p|e|-eval|-print)\b/.test(l));
+  assert.deepEqual(evals, [],
+    `install.ps1 evaluates JS through the shell, which mangles quotes: ${evals.join(' | ')}`);
+  assert.match(ps, /node --version/, 'it should read the version directly');
+});
+
 test('the shell installer is stored with unix line endings', () => {
   /*
    * `install.sh` is the first thing anyone runs, and a CRLF copy fails on macOS
