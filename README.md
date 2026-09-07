@@ -41,6 +41,15 @@ pairing codes. Open one on your phone and **Share → Add to Home Screen**.
 You need [Claude Code](https://claude.com/claude-code) installed and signed in
 first. The installer checks, but deliberately does not sign you in for you.
 
+### Installing it with an agent
+
+Point your coding agent at this repo and it will find **[AGENTS.md](AGENTS.md)**,
+which is written for that: exact commands, what each one should print, and the
+two places it must stop and ask you rather than decide for itself — signing in
+to Claude Code, and choosing how the server gets exposed.
+
+> Install Foovox from https://github.com/redfoo22/foovox — follow AGENTS.md.
+
 ### What it downloads
 
 About 350 MB of speech models on first run: Kokoro for the voice, Whisper for

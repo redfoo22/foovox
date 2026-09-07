@@ -41,7 +41,17 @@ test('nothing shipped hardcodes the Windows virtualenv layout', () => {
   for (const file of shippedFiles()) {
     // The helper and this test are allowed to name both spellings; that is
     // their whole job.
-    if (file === 'scripts/venv-python.mjs' || file === 'tests/portability.test.mjs') continue;
+    if (file === 'scripts/venv-python.mjs') continue;
+    /*
+     * This guards *runtime code*, so prose and tests are exempt.
+     *
+     * Documentation has to be free to describe the trap — AGENTS.md warns about
+     * the `WindowsApps\python3.exe` stub by name — and a test proves the
+     * resolver handles a Windows path by naming one as an input. Both are the
+     * opposite of the mistake being guarded against, and flagging them would
+     * teach people to silence this test rather than read it.
+     */
+    if (file.endsWith('.md') || file.startsWith('tests/')) continue;
     /*
      * Only *unconditional* uses count. `IS_WIN ? 'Scripts' : 'bin'` is the
      * correct way to spell this and must not be flagged, or the test cries wolf
