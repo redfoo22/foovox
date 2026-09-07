@@ -177,12 +177,27 @@ function killPid(pid) {
 /** Start a long-lived process detached, so the CLI can exit without killing it. */
 function startDetached(name, cmd, args, env = {}) {
   mkdirSync(DATA, { recursive: true });
+  /*
+   * No shell when the command is a real path, which on Windows is the
+   * difference between being able to stop these services and not.
+   *
+   * `shell: true` runs the program under cmd.exe, and `child.pid` is then the
+   * pid of *cmd.exe*, not of node or python. That wrapper exits as soon as it
+   * has handed off, so the pid written to pids.json is dead within a second
+   * while the service itself keeps running. `foovox stop` looked up the pid,
+   * found it not alive, killed nothing, printed nothing, and exited 0 — and
+   * the only way to stop the services was to find them by command line.
+   *
+   * All three call sites pass an absolute path already, so the shell was never
+   * doing anything except losing the process.
+   */
+  const needsShell = IS_WIN && !path.isAbsolute(cmd) && !cmd.includes(path.sep);
   const child = spawn(cmd, args, {
     cwd: ROOT,
     env: { ...process.env, ...env },
     detached: !IS_WIN,
     stdio: 'ignore',
-    shell: IS_WIN,
+    shell: needsShell,
     windowsHide: true,
   });
   child.unref();
@@ -384,10 +399,30 @@ async function start() {
 
 async function stop() {
   const pids = readPids();
+  let stopped = 0;
   for (const [name, pid] of Object.entries(pids)) {
-    if (alive(pid)) { killPid(pid); ok(`stopped ${name}`); }
+    if (alive(pid)) { killPid(pid); ok(`stopped ${name}`); stopped += 1; }
   }
   try { unlinkSync(PIDS); } catch { /* nothing to remove */ }
+
+  /*
+   * Say so when there was nothing to stop, and check the ports rather than
+   * trusting the pid file.
+   *
+   * This used to print nothing at all and exit 0 whether it had stopped two
+   * services or none, so a stale pid file was indistinguishable from success —
+   * which is exactly how orphaned services went unnoticed until the next start
+   * failed on a port already in use.
+   */
+  if (!stopped) info('nothing was running (no live pids recorded)');
+  for (const [label, port, up] of [['server', PORT, serverUp], ['speech', SPEECH_PORT, speechUp]]) {
+    if (await up()) {
+      bad(`${label} is still answering on ${port} — it was not started by this command`);
+      info(IS_WIN
+        ? `Find it with: netstat -ano | findstr :${port}`
+        : `Find it with: lsof -i :${port}`);
+    }
+  }
   return 0;
 }
 
