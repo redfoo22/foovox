@@ -68,6 +68,40 @@ function which(cmd) {
   return String(r.stdout || '').split(/\r?\n/).find(Boolean) ?? null;
 }
 
+/**
+ * A Python that is genuinely there, not merely on PATH.
+ *
+ * Windows ships stub executables at `WindowsApps\python3.exe` that exist, are
+ * found by `where`, and do nothing but print "Python was not found; run without
+ * arguments to install from the Microsoft Store" and fail. Picking an
+ * interpreter by existence alone therefore chose the stub on a machine with
+ * Python 3.11 installed, and the install died at "could not create the python
+ * environment" with the real cause buried above it.
+ *
+ * So each candidate is *run*, and has to report a version we can use. `py -3`
+ * comes first on Windows because the launcher is the one thing that reliably
+ * resolves to a real install; `python3` comes last there for the same reason it
+ * comes first everywhere else.
+ */
+function findPython() {
+  const candidates = IS_WIN
+    ? [['py', ['-3']], ['python', []], ['python3', []]]
+    : [['python3', []], ['python', []]];
+
+  for (const [cmd, prefix] of candidates) {
+    if (!which(cmd)) continue;
+    const r = run(cmd, [...prefix, '--version']);
+    if (r.status !== 0) continue;
+    const version = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim(); // 3.4 prints to stderr
+    const m = version.match(/Python (\d+)\.(\d+)/);
+    if (!m) continue;
+    const [major, minor] = [Number(m[1]), Number(m[2])];
+    if (major < 3 || (major === 3 && minor < 10)) continue;
+    return { cmd, prefix, version: `${major}.${minor}` };
+  }
+  return null;
+}
+
 /** Tailscale ships as a GUI app on Windows and macOS; the binary is not always on PATH. */
 function tailscaleBin() {
   const onPath = which('tailscale');
@@ -204,6 +238,20 @@ const CHECKS = [
     slow: true,
   },
   {
+    // Checked separately from the virtualenv, because "no interpreter" and
+    // "interpreter fine, environment not built yet" need different fixes and
+    // used to be reported as the same thing.
+    name: 'Python 3.10+',
+    check: () => {
+      const py = findPython();
+      return py ? `${py.version} (${py.cmd})` : false;
+    },
+    fix: IS_WIN
+      ? 'Install from python.org. If `python3` opens the Microsoft Store, turn the '
+        + 'alias off in Settings > Apps > Advanced app settings > App execution aliases.'
+      : 'Install Python 3.10+ from python.org, or: brew install python',
+  },
+  {
     name: 'Python virtual environment',
     check: () => (existsSync(venvPython()) ? venvPython() : false),
     fix: 'Run: foovox install',
@@ -267,9 +315,17 @@ async function install() {
   // 2. Python environment. Speech runs on CPU on purpose — see README.
   if (!existsSync(venvPython())) {
     info('creating python environment…');
-    const py = which('python3') ?? which('python');
-    if (!py) { bad('Python 3.10+ not found. Install it from https://python.org'); return 1; }
-    const venv = run(py, ['-m', 'venv', path.join(ROOT, 'venv')], { stdio: 'inherit' });
+    const py = findPython();
+    if (!py) {
+      bad('No working Python 3.10+ found. Install it from https://python.org');
+      if (IS_WIN) {
+        info('If `python3` opens the Microsoft Store, turn off the alias in');
+        info('Settings > Apps > Advanced app settings > App execution aliases.');
+      }
+      return 1;
+    }
+    info(`using Python ${py.version} (${py.cmd})`);
+    const venv = run(py.cmd, [...py.prefix, '-m', 'venv', path.join(ROOT, 'venv')], { stdio: 'inherit' });
     if (venv.status !== 0) { bad('could not create the python environment'); return 1; }
   }
   ok('python environment');
