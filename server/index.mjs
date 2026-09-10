@@ -53,7 +53,7 @@ const WORK_DIR = process.env.FOOVOX_WORK_DIR ?? path.join(ROOT, 'data', 'work');
 
 const log = new Log(path.join(ROOT, 'data', 'events.log'));
 const devices = new DeviceStore({ path: path.join(ROOT, 'data', 'devices.json'), log });
-const sessions = new SessionStore();
+const sessions = new SessionStore({ file: path.join(ROOT, 'data', 'sessions.json') });
 
 /**
  * Bootstrap admin token.
@@ -400,6 +400,10 @@ wss.on('connection', (ws) => {
     // Queued behind the audio, so `done` means "you have heard everything".
     s.on('done', ({ ms }) => {
       const mine = turn;
+      // Written here rather than on a timer: this is the moment the resume id
+      // and the finished exchange both exist, and the moment a restart would
+      // otherwise lose them.
+      sessions.save();
       chain = chain.then(() => { if (mine === turn) send({ type: 'done', ms }); });
     });
   };
@@ -638,7 +642,14 @@ wss.on('connection', (ws) => {
       session = target;
       attach(session);
       session.start();
-      return send({ type: 'session', session: session.view(), sessions: sessions.list() });
+      // The transcript goes with it. Without this the screen kept whichever
+      // conversation you had been reading, while your words went somewhere else.
+      return send({
+        type: 'session',
+        session: session.view(),
+        sessions: sessions.list(),
+        history: session.transcript(),
+      });
     }
 
     if (msg.type === 'new') {
@@ -651,7 +662,9 @@ wss.on('connection', (ws) => {
       attach(session);
       session.start();
       log.append('session:created', { id: session.id, principalId: ws.device.principalId, tier: session.tier });
-      return send({ type: 'session', session: session.view(), sessions: sessions.list() });
+      return send({
+        type: 'session', session: session.view(), sessions: sessions.list(), history: [],
+      });
     }
 
     // Same shape as arming tools: the model is a process argument, so the

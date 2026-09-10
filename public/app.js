@@ -80,7 +80,17 @@ const state = {
      * still raise it further if things get louder. Null until calibrated.
      */
     noiseFloor: null,
-    bargeIn: false,
+    /*
+     * Talk over the reply by default.
+     *
+     * This shipped off because early on the phone heard itself through the
+     * speaker and interrupted its own first sentence. That was an echo problem,
+     * and it has since been fixed properly - the guard measures what the
+     * speaker is emitting and subtracts it, rather than going deaf while
+     * audio plays. Being able to cut in is most of what makes this feel like a
+     * conversation, so it is on unless someone turns it off.
+     */
+    bargeIn: true,
     voice: 'af_heart',
     // Measured warm time-to-first-token: Sonnet 833 ms, Opus 891 ms, Haiku
     // 1303 ms, Fable 2647 ms. Opus costs about 60 ms over Sonnet, so there is
@@ -132,16 +142,21 @@ const log = (msg) => { $('status').textContent = msg; };
  * already using it. `v` is how a default that turned out to be wrong gets
  * corrected once, without throwing away the rest of someone's preferences.
  */
-const SETTINGS_VERSION = 2;
+const SETTINGS_VERSION = 3;
 try {
   const saved = JSON.parse(localStorage.getItem('foovox') || '{}');
   const stale = (saved.v ?? 1) < SETTINGS_VERSION;
   Object.assign(state.settings, saved);
   if (stale) {
-    // v2: talk-over defaults off. On a speakerphone it was hearing itself and
-    // interrupting its own first sentence, which made the app unusable; it is
-    // opt-in until it is trustworthy.
-    state.settings.bargeIn = false;
+    /*
+     * v3: talk-over defaults **on**.
+     *
+     * v2 forced it off, because the phone was hearing itself and interrupting
+     * its own first sentence. The echo guard fixed that at the source, so the
+     * reason for the old default is gone - and anyone still carrying the v2
+     * setting would otherwise never see the feature.
+     */
+    state.settings.bargeIn = true;
   }
   state.settings.v = SETTINGS_VERSION;
 } catch { /* defaults are fine */ }
@@ -163,6 +178,30 @@ function bubble(who, text) {
 }
 
 let replyEl = null;
+
+/**
+ * Replace the transcript with a session's own messages.
+ *
+ * An empty history is still a redraw: moving to a fresh session has to clear
+ * the old one's words, or a brand new conversation appears to already contain
+ * somebody else's.
+ */
+function showHistory(history) {
+  const box = $('transcript');
+  box.innerHTML = '';
+  replyEl = null;
+  for (const { role, text } of history) {
+    if (text) bubble(role === 'me' ? 'me' : 'claude', text);
+  }
+  if (!history.length) {
+    const hint = document.createElement('div');
+    hint.id = 'empty';
+    hint.innerHTML = '<p><strong>New session.</strong></p>'
+      + '<p>Tap Talk and speak, or hold it down like a walkie-talkie.</p>';
+    box.append(hint);
+  }
+  box.scrollTop = box.scrollHeight;
+}
 
 // ---------------------------------------------------------------- playback
 
@@ -555,6 +594,15 @@ function connect() {
         if (msg.session.model) $('model').value = msg.session.model;
         if (msg.session.tier) { tier.value = msg.session.tier; showTier(); }
         if (msg.sessions) state.sessions = msg.sessions;
+        /*
+         * Redraw the screen to match the session you just moved to.
+         *
+         * Switching used to change which process your words went to and leave
+         * the previous conversation on display, so every session looked like
+         * whichever one you had read last and none of them looked saved. The
+         * server now sends what was said; this is what puts it back.
+         */
+        if (Array.isArray(msg.history)) showHistory(msg.history);
         refreshSessions();
         log(msg.session.warm ? 'ready' : 'starting…');
         break;

@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import os from 'node:os';
 import path from 'node:path';
-import { existsSync, mkdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { normaliseTier, tierArgs, tierAllows, setRuntimeTools } from './permissions.mjs';
 import { makeSpeechFilter } from './speech-text.mjs';
 
@@ -250,6 +250,16 @@ class Session extends EventEmitter {
     this.status = 'idle';       // idle | working | done | error
     this.turns = 0;
     this.reply = '';            // text of the current or last reply
+    /*
+     * What was actually said, so a session can be returned to.
+     *
+     * The claude process holds the real conversation and `--resume` restores
+     * it, but that is invisible: nothing here could redraw the screen. Tapping
+     * a session in the rail swapped which process you were talking to and left
+     * the previous one's messages on display, so every session looked like
+     * whatever you had been reading last. The model remembered; the app did not.
+     */
+    this.history = [];          // [{ role: 'me' | 'claude', text, at }]
     this.toolLog = [];          // recent tool calls, for "what is it doing"
     this.startedAt = null;
     this.finishedAt = null;
@@ -415,6 +425,7 @@ class Session extends EventEmitter {
       this.busy = false;
       this.lastUsed = Date.now();
       this.finishedAt = Date.now();
+      if (this.reply.trim()) this.remember('claude', this.reply.trim());
       /*
        * A cancelled turn reports `error_during_execution`, which is not a
        * failure worth showing anyone — it is what an interruption looks like
@@ -442,6 +453,7 @@ class Session extends EventEmitter {
     this.startedAt = Date.now();
     this.finishedAt = null;
     if (!this.title) this.title = String(text).slice(0, 60);
+    this.remember('me', text);
     const frame = { type: 'user', message: { role: 'user', content: [{ type: 'text', text }] } };
     this.proc.stdin.write(`${JSON.stringify(frame)}\n`);
   }
@@ -513,6 +525,27 @@ class Session extends EventEmitter {
     return true;
   }
 
+  /**
+   * Add a line to the transcript this session can be restored from.
+   *
+   * Capped by count and by characters. An unbounded transcript is a slow leak
+   * that only shows up after a long day of talking, and nobody scrolls back
+   * through two hundred turns on a phone anyway.
+   */
+  remember(role, text) {
+    this.history.push({ role, text: String(text).slice(0, 8000), at: Date.now() });
+    while (this.history.length > 120) this.history.shift();
+    let total = this.history.reduce((n, h) => n + h.text.length, 0);
+    while (total > 60_000 && this.history.length > 1) {
+      total -= this.history.shift().text.length;
+    }
+  }
+
+  /** Everything needed to draw this session on a screen that has never seen it. */
+  transcript() {
+    return this.history.map(({ role, text }) => ({ role, text }));
+  }
+
   stop() {
     this.busy = false;
     if (this.proc) { try { this.proc.kill(); } catch {} this.proc = null; }
@@ -547,18 +580,87 @@ class Session extends EventEmitter {
 }
 
 export class SessionStore {
-  constructor({ idleMs = 15 * 60 * 1000 } = {}) {
+  /**
+   * `file` is where the conversation list survives a restart.
+   *
+   * Sessions used to live only in this Map. Restarting the server - a deploy, a
+   * crash, a reboot - silently discarded every one of them, and the rail came
+   * back empty, so it looked like nothing was ever saved. The claude process
+   * cannot be kept across a restart, but the thing that matters can: the resume
+   * id, which hands the whole conversation back to a fresh process on the next
+   * question.
+   */
+  constructor({ idleMs = 15 * 60 * 1000, file = null } = {}) {
     this.sessions = new Map();
     this.idleMs = idleMs;
+    this.file = file;
     this.timer = setInterval(() => this.reap(), 60_000);
     this.timer.unref?.();
+    this.load();
   }
 
   create(opts = {}) {
     const id = `s_${Math.random().toString(36).slice(2, 10)}`;
     const session = new Session({ id, ...opts });
     this.sessions.set(id, session);
+    this.save();
     return session;
+  }
+
+  /**
+   * Write the conversation list out.
+   *
+   * Via a temporary file and a rename, because this is written on every turn
+   * and a process that dies mid-write would otherwise leave truncated JSON that
+   * loses every session rather than the one turn in flight.
+   */
+  save() {
+    if (!this.file) return;
+    try {
+      mkdirSync(path.dirname(this.file), { recursive: true });
+      const sessions = [...this.sessions.values()]
+        .filter((s) => s.claudeSessionId || s.history.length)
+        .map((s) => ({
+          id: s.id,
+          kind: s.kind,
+          model: s.model,
+          tier: s.tier,
+          cwd: s.cwd,
+          resume: s.claudeSessionId,
+          title: s.title,
+          turns: s.turns,
+          lastUsed: s.lastUsed,
+          history: s.history,
+        }));
+      const tmp = `${this.file}.tmp`;
+      writeFileSync(tmp, `${JSON.stringify({ sessions }, null, 2)}
+`);
+      renameSync(tmp, this.file);
+    } catch {
+      // Losing the list is bad; refusing to answer because it could not be
+      // written would be worse.
+    }
+  }
+
+  load() {
+    if (!this.file || !existsSync(this.file)) return;
+    try {
+      const { sessions = [] } = JSON.parse(readFileSync(this.file, 'utf8'));
+      for (const r of sessions) {
+        if (!r?.id) continue;
+        const session = new Session({
+          id: r.id, kind: r.kind, model: r.model, tier: r.tier,
+          cwd: r.cwd, resume: r.resume,
+        });
+        session.title = r.title ?? null;
+        session.turns = Number(r.turns ?? 0);
+        session.lastUsed = Number(r.lastUsed ?? Date.now());
+        session.history = Array.isArray(r.history) ? r.history : [];
+        this.sessions.set(session.id, session);
+      }
+    } catch {
+      // A corrupt file starts empty rather than refusing to boot.
+    }
   }
 
   get(id) { return this.sessions.get(String(id ?? '')) ?? null; }
@@ -574,6 +676,7 @@ export class SessionStore {
     if (!s) return false;
     s.stop();
     this.sessions.delete(s.id);
+    this.save();
     return true;
   }
 

@@ -11,7 +11,7 @@
 
 // v2: barge-in fixes. Bumping the name makes activate() delete the old
 // cache, so a phone cannot keep serving the build that would not stop talking.
-const CACHE = 'foovox-v19';
+const CACHE = 'foovox-v20';
 const SHELL = ['/', '/app.js', '/echo.js', '/level.js', '/intent.js', '/app.css', '/theme.css', '/capture-worklet.js', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
