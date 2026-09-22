@@ -61,10 +61,36 @@ const VOICE_PROMPT = [
   'Their words reach you through speech-to-text, so expect occasional',
   'mis-transcriptions of technical terms and infer what they meant rather than',
   'querying it.',
-  // Spoken length is not written length: a paragraph that scans in two seconds
-  // takes twenty to listen to, and cannot be skimmed or re-read.
-  'Keep answers to roughly thirty spoken words unless asked for more. Answer',
-  'the question first, then stop. Offer detail rather than delivering it.',
+  /*
+   * Length, pace and manner. Spoken length is not written length: a paragraph
+   * that scans in two seconds takes twenty to listen to, and cannot be skimmed
+   * or re-read.
+   *
+   * This was a word count, which the model met by writing one dense
+   * thirty-word sentence. Sentences are the better unit because they are what
+   * a listener actually parses, and because two short ones land far better
+   * than one long one.
+   */
+  'Keep it to one or two sentences unless they ask for more. Answer first,',
+  'then stop. Offer detail rather than delivering it.',
+  '',
+  'Match their tone, cadence and energy. If they are brief, be brief; if they',
+  'are thinking out loud, give them room. Let them lead the pace — do not fill',
+  'a pause, and do not ask a follow-up question just to keep the turn going.',
+  '',
+  /*
+   * No preamble. This is the single biggest difference between something that
+   * feels like a conversation and something that feels like a form response:
+   * the listener has already waited for the round trip, and every word before
+   * the answer is spent silence.
+   *
+   * Distinct from the short lines spoken while a tool runs — those cover real
+   * latency and are generated here, not by the model.
+   */
+  'No filler and no preamble. Do not open with "Great question", "Sure",',
+  '"Let me help you with that" or a restatement of what they just said. Start',
+  'with the answer. Do not repeat a point you have already made in this',
+  'conversation, and do not summarise what you just said.',
 ].join(' ');
 
 /*
@@ -294,9 +320,24 @@ class Session extends EventEmitter {
     // code should not be shell access on a machine that also runs a live site
     // and a logged-in storefront.
     args.push(...tierArgs(this.tier));
+    /*
+     * No shell. `shell: true` on Windows hands the whole command to cmd.exe,
+     * which re-splits it on spaces — and this spawn passes a several-hundred
+     * word system prompt as one argument.
+     *
+     * The prompt was therefore never applied. `--append-system-prompt` received
+     * the single word "You", and the rest of the instruction arrived as a few
+     * hundred stray arguments. That is why replies stayed long and full of
+     * markdown no matter what the prompt said: the model had never been told
+     * any of it. Reading the live command line is what showed it — the flag was
+     * sitting there completely unquoted.
+     *
+     * CLAUDE is an absolute path, so there was nothing for the shell to resolve
+     * in the first place. The same mistake is documented in bin/foovox.mjs,
+     * where `-p` lost its prompt the same way.
+     */
     this.proc = spawn(CLAUDE, args, {
       cwd,
-      shell: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
